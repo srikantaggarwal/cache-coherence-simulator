@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ $# -lt 3 ]
+then
+	echo "Usage:"
+	echo "./runtest [testType] [coherence_protocol] [file]"
+	echo "testType: -h = hitrate  -i = invalidations"
+	echo "coherence_protocol: -msi -mesi"
+	exit 1
+fi
+
+if [ ! -d "graphing" ]
+then
+	mkdir graphing
+fi
+
+if [ -e graphing/results ]
+then
+	rm graphing/results
+	echo "Removing results"
+fi
+
+javac *.java
+
+if [ "$1" = "-h" ]
+then
+	if [ "$2" = "-msi" ]
+	then
+		java ResultsGen -t 0 $3
+		cd graphing
+		./gnuplot_hit_msi
+		evince output.eps
+	else
+		java ResultsGen -t 0 $3
+		cd graphing
+    	./gnuplot_hit_mesi
+    	evince output.eps
+	fi
+else
+	if [ "$2" = "-msi" ]
+	then
+		java ResultsGen -t 1 $3
+		cd graphing
+		./gnuplot_invalidations_msi
+		evince output.eps
+	else
+		java ResultsGen -t 1 $3
+		cd graphing
+    	./gnuplot_invalidations_mesi
+    	evince output.eps
+	fi
+fi
+
