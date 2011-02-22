@@ -229,7 +229,7 @@ public class MESICache implements Cache{
 		
 		//Notify other caches of this operation
 		for(int i = 0; i < otherCaches.length; i++){
-			otherCaches[i].remoteStore(address, found, verbose);
+			otherCaches[i].remoteStore(address, hit, verbose);
 		}
 	}
 	
@@ -239,10 +239,13 @@ public class MESICache implements Cache{
 		int block = (int)(memoryBlock%blocks); //The block in cache where we will put the memoryBlock
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
-		status[block] = 1;
-		
+		if(tag == tags[block]){
+			if(valid[block])
+				status[block] = 1;
+		}
+
 		if(showGui){
-			gui.updateBlock(cacheNumber, block, cache[block], tag);
+			//gui.updateBlock(cacheNumber, block, cache[block], tag);
 			gui.setStatus(cacheNumber, block, status[block]);
 			gui.updateStats(cacheNumber, operations, hits, invalidations);
 		}
@@ -254,11 +257,16 @@ public class MESICache implements Cache{
 		int block = (int)(memoryBlock%blocks); //The block in cache where we will put the memoryBlock
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
-		status[block] = 0;
-		invalidations++;
+		if(tag == tags[block]){
+			if(valid[block]){
+				status[block] = 0;
+				invalidations++;
+			}
+		}
+
 		
 		if(showGui){
-			gui.updateBlock(cacheNumber, block, cache[block], tag);
+			//gui.updateBlock(cacheNumber, block, cache[block], tag);
 			gui.setStatus(cacheNumber, block, status[block]);
 			gui.updateStats(cacheNumber, operations, hits, invalidations);
 		}

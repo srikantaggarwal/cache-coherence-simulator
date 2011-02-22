@@ -28,7 +28,6 @@ public class ResultsGen{
 			fileWriter.write(String.format("#blocks\tblock size\t%s\n", testType == 0 ? "hit rate":"Total invalidations"));
 			
 			for(int blocks = 2; blocks <= 512; blocks += 16){
-				System.out.println("Outer "+blocks);
 				for(int blockSize = 2; blockSize <= 512; blockSize += 16){
 					Simulator simulator = new Simulator(blocks, blockSize, coherenceProtocol, traceFile);
 					float result = simulator.runTest(testType);
