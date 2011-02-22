@@ -152,9 +152,11 @@ public class CacheGUI extends JFrame{
 		characteristics[6] = new JLabel("  Invalid  ");
 		characteristics[6].setBackground(invalidColor);
 		characteristics[6].setOpaque(true);
-		characteristics[7] = new JLabel("  Exclusive  ");
-		characteristics[7].setBackground(exclusiveColor);
-		characteristics[7].setOpaque(true);
+		if(coherence_protocol == 1){
+			characteristics[7] = new JLabel("  Exclusive  ");
+			characteristics[7].setBackground(exclusiveColor);
+			characteristics[7].setOpaque(true);
+		}
 
 		JPanel jPanel = new JPanel();
 		jPanel.setBorder(new TitledBorder("Cache characteristics"));
@@ -165,7 +167,8 @@ public class CacheGUI extends JFrame{
 		jPanel.add(characteristics[4]);
 		jPanel.add(characteristics[5]);
 		jPanel.add(characteristics[6]);
-		jPanel.add(characteristics[7]);
+		if(coherence_protocol == 1)
+			jPanel.add(characteristics[7]);
 		
 		container.setMaximumSize(new Dimension(Toolkit.getDefaultToolkit().getScreenSize().width, 100));
 		container.add(jPanel);

@@ -49,6 +49,7 @@ public class MESICache implements Cache{
 	public void load(long address, boolean verbose){
 		
 		boolean found = false;
+		boolean hit = false;
 		
 		operations++;
 		long memoryBlock = address/blockSize; //The block in main memory where we will find the word
@@ -62,17 +63,54 @@ public class MESICache implements Cache{
 		}
 		
 		//Check if this block is in the cache
-		// If we find the tag
+		// If we find the tag and it is valid
 		// READ HIT
-		if((tag == tags[block]) && valid[block]){
+		if((tag == tags[block]) && valid[block] && status[block] != 0){
 			// Then we can load it from the cache and increase the hit count
 			if(verbose){
 				System.out.printf("Found tag %d in block %d!\n\n", tag, block);
 			}
-			// Do not need to change state on read hit
+			// If we are in states M, E or S we stay there
+			hit = true;
 			hits++;
 			found = true;
+		} 
+		
+		if(status[block] == 0){ // if cache line is in invalid state
+			//Check if the line exists in any other cache
+			for(int i = 0; i < otherCaches.length; i++){
+				if(otherCaches[i].getTags()[block] == tag){
+					//We have found the tage in another cache, load line into cache and goto shared state
+					//Loading the corresponding block from memory to the cache
+					for(int j = 0; j < cache[block].length; j++){
+						cache[block][j] = memoryBlock*blockSize+j;
+						tags[block] = tag;
+						valid[block] = true;
+					}
+					status[block] = 1;
+					found = true;
+					break;
+				}
+			}
+			
+			if(!found){
+				//No other cache has this block. We can now load it into cache and go to exclusive state
+				//Loading the corresponding block from memory to the cache
+				for(int j = 0; j < cache[block].length; j++){
+					cache[block][j] = memoryBlock*blockSize+j;
+					tags[block] = tag;
+					valid[block] = true;
+				}
+				status[block] = 3;
+				found = true;
+			}
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
 		}
+		
 		
 		// READ MISS
 		if(!found){
@@ -82,9 +120,6 @@ public class MESICache implements Cache{
 				tags[block] = tag;
 				valid[block] = true;
 			}
-			
-			//set status of this cache block to be shared (can only have read miss in invalid state)
-			status[block] = 1;
 			
 			//Update the gui
 			if(showGui){
@@ -104,13 +139,14 @@ public class MESICache implements Cache{
 		
 		//Notify other caches of this operation
 		for(int i = 0; i < otherCaches.length; i++){
-			otherCaches[i].remoteLoad(address, found, verbose);
+			otherCaches[i].remoteLoad(address, hit, verbose);
 		}
 		
 	}
 	
 	public void store(long address, boolean verbose){
 		
+		boolean hit = false;
 		boolean found = false;
 		
 		operations++;
@@ -125,9 +161,9 @@ public class MESICache implements Cache{
 		}
 		
 		//Check if this block is in the cache
-		//If we find the tag
+		//If we find the tag and it's not invalid
 		//WRITE HIT
-		if((tag == tags[block]) && valid[block]){
+		if((tag == tags[block]) && valid[block] && status[block] != 0){
 			// Then we can load it from the cache and increase the hit count
 			if(verbose){
 				System.out.println("Write hit!!");
@@ -135,7 +171,10 @@ public class MESICache implements Cache{
 			}
 			hits++;
 			found = true;
+			hit = true;
 			//If block is in Shared state, changed to modified
+			//Dont really care if exlcusive as it is write through and 
+			//since it is exclusive no other cache will be affected by new value.
 			if(status[block] == 1){
 				status[block] = 2;
 				if(showGui){
@@ -145,6 +184,23 @@ public class MESICache implements Cache{
 					System.out.printf("Setting status of cache %d block %d to modified\n", cacheNumber, block);
 				}
 			}
+		}
+		
+		//If the block is invalid state, load it from memory and change to modified state
+		if(status[block] == 0){
+			//Loading the corresponding block from memory to the cache
+			for(int i = 0; i < cache[block].length; i++){
+				cache[block][i] = memoryBlock*blockSize+i;
+				tags[block] = tag;
+				valid[block] = true;
+			}
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
+			
+			found = true;
 		}
 		
 		//WRITE MISS
@@ -158,9 +214,6 @@ public class MESICache implements Cache{
 				tags[block] = tag;
 				valid[block] = true;
 			}
-			
-			//set status of this cache block to shared
-			status[block] = 1;
 			
 			//Update the gui
 			if(showGui){
@@ -186,26 +239,13 @@ public class MESICache implements Cache{
 		int block = (int)(memoryBlock%blocks); //The block in cache where we will put the memoryBlock
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
-		//Do we have the remote address in this cache?
-		if((tag == tags[block]) && valid[block]){
-			
-			//was it a read hit? dont care
-			//Was it a read miss?
-			if(!hit){
-				//If it is a remote read miss and we are in modified state, go to shared state
-				if(status[block] == 2){
-					status[block] = 1;
-					if(showGui){
-						gui.setStatus(cacheNumber, block, status[block]);
-						gui.updateStats(cacheNumber, operations, hits, invalidations);
-					}
-				}
-				//If it is a remote read miss and we are in shared state, stay in shared state
-			}
-			
+		status[block] = 1;
+		
+		if(showGui){
+			gui.updateBlock(cacheNumber, block, cache[block], tag);
+			gui.setStatus(cacheNumber, block, status[block]);
+			gui.updateStats(cacheNumber, operations, hits, invalidations);
 		}
-		
-		
 	}
 	
 	public void remoteStore(long address, boolean hit, boolean verbose){
@@ -214,48 +254,13 @@ public class MESICache implements Cache{
 		int block = (int)(memoryBlock%blocks); //The block in cache where we will put the memoryBlock
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
-		//Do we have the remote address in this cache?
-		if((tag == tags[block]) && valid[block]){
-			
-			//Was it a remote write hit? Our Cache copy is now invalid
-			if(hit){
-				if(status[block] != 0){
-					status[block] = 0;
-					invalidations++;
-					if(verbose)
-						System.out.printf("\nCACHE %d INVALIDATION!!!\n\n", cacheNumber);
-					if(showGui){
-						gui.setStatus(cacheNumber, block, status[block]);
-						gui.updateStats(cacheNumber, operations, hits, invalidations);
-					}
-				}
-			}
-			
-			//Was it a remote write miss?
-			if(!hit){
-				//If it was a remote write miss and we are in modified state change to Invalid
-				if(status[block] == 2){
-					status[block] = 0;
-					invalidations++;
-					if(verbose)
-						System.out.printf("\nCACHE %d INVALIDATION!!!\n\n", cacheNumber);
-					if(showGui){
-						gui.setStatus(cacheNumber, block, status[block]);
-						gui.updateStats(cacheNumber, operations, hits, invalidations);
-					}
-				}
-				//If it was a remote write miss and we are in shared state change to Invalid
-				if(status[block] == 1){
-					status[block] = 0;
-					invalidations++;
-					if(verbose)
-						System.out.printf("\nCACHE %d INVALIDATION!!!\n\n", cacheNumber);
-					if(showGui){
-						gui.setStatus(cacheNumber, block, status[block]);
-						gui.updateStats(cacheNumber, operations, hits, invalidations);
-					}
-				}
-			}
+		status[block] = 0;
+		invalidations++;
+		
+		if(showGui){
+			gui.updateBlock(cacheNumber, block, cache[block], tag);
+			gui.setStatus(cacheNumber, block, status[block]);
+			gui.updateStats(cacheNumber, operations, hits, invalidations);
 		}
 	}
 	
@@ -278,6 +283,10 @@ public class MESICache implements Cache{
 				otherCaches[filled++] = (MESICache) caches[i];
 			}
 		}
+	}
+	
+	public int[] getTags(){
+		return tags;
 	}
 	
 	public int getOperations(){

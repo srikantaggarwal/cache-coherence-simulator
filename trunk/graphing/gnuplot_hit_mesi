@@ -9,5 +9,6 @@ set xlabel 'blocks'
 set ylabel 'block size'
 set zlabel 'hit rate' rotate right
 set grid
+set view 65,307
 set border 4095 front linetype -1 linewidth 1.000
 splot 'results' with lines 

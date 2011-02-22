@@ -133,7 +133,9 @@ public class MSICache implements Cache{
 				System.out.println("Write hit!!");
 				System.out.printf("Found tag %d in block %d!\n", tag, block);
 			}
-			hits++;
+			if(status[block] != 2){
+				hits++;
+			}
 			found = true;
 			//If block is in Shared state, changed to modified
 			if(status[block] == 1){
