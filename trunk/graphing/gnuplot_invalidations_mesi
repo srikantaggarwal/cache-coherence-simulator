@@ -1,0 +1,14 @@
+#!/usr/bin/gnuplot -persist
+set term postscript eps enhanced color
+set output 'output.eps'
+set pm3d at b
+set ticslevel 0.1
+set isosample 400,400
+set title 'Total Invalidations In A MESI Cache'
+set xlabel 'blocks'
+set ylabel 'block size'
+set zlabel 'Total Invalidations' rotate right
+set grid
+set border 4095 front linetype -1 linewidth 1.000
+set view 115,50
+splot 'results' with lines
