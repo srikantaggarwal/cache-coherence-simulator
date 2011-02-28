@@ -298,7 +298,7 @@ public class CacheGUI extends JFrame{
 		return container;
 	}
 	
-	Container createStatsContainer(int cache){
+	private Container createStatsContainer(int cache){
 		
 		//0 = Operations counter, 1 = Hits, 2 = Misses, 3 = Hit rate
 		Container container = new Container();

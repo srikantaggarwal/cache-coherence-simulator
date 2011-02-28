@@ -1,8 +1,9 @@
 #!/usr/bin/gnuplot -persist
 set term postscript eps enhanced color
 set output 'output.eps'
-set pm3d at b
+set pm3d
 set ticslevel 0.1
+set dgrid3d 40,40
 set isosample 400,400
 set title 'Total Invalidations In An MSI Cache'
 set xlabel 'blocks'
@@ -10,5 +11,5 @@ set ylabel 'block size'
 set zlabel 'Total Invalidations' rotate right
 set grid
 set border 4095 front linetype -1 linewidth 1.000
-set view 115,50
+set view 112,335
 splot 'results' with lines

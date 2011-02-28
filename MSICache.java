@@ -15,7 +15,7 @@ public class MSICache implements Cache{
 	//The cache
 	long[][] cache;
 	int[] tags;
-	boolean[] valid;
+	boolean[] used;
 	int[] status; //Status' 0 = Invalid, 1 = shared, 2 modified
 	
 	MSICache[] otherCaches = new MSICache[3];
@@ -34,11 +34,11 @@ public class MSICache implements Cache{
 		
 		cache = new long[blocks][blockSize];
 		tags = new int[blocks];
-		valid = new boolean[blocks];
+		used = new boolean[blocks];
 		status = new int[blocks];
 		
-		for(int i = 0; i < valid.length; i++){
-			valid[i] = false;
+		for(int i = 0; i < used.length; i++){
+			used[i] = false;
 			status[i] = 0;
 			
 			if(showGui) gui.setStatus(cacheNumber, i, status[i]);
@@ -48,6 +48,7 @@ public class MSICache implements Cache{
 	
 	public void load(long address, boolean verbose){
 		
+		boolean hit = false;
 		boolean found = false;
 		
 		operations++;
@@ -61,17 +62,54 @@ public class MSICache implements Cache{
 			System.out.printf("Looking for word %d with tag %d in block %d\n", address, tag, block);
 		}
 		
+		if(!used[block]){ //If this line is empty
+			//Loading the corresponding block from memory to the cache
+			for(int i = 0; i < cache[block].length; i++){
+				cache[block][i] = memoryBlock*blockSize+i;
+				tags[block] = tag;
+				used[block] = true;
+			}
+			
+			//set status of this cache block to be shared (can only have read miss in invalid state)
+			status[block] = 1;
+			
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
+			if(verbose){
+				System.out.println("READ MISS!");
+				System.out.printf("Loading block %d into cache\n\n", block);
+			}
+			found = true;
+		}
 		//Check if this block is in the cache
 		// If we find the tag
 		// READ HIT
-		if((tag == tags[block]) && valid[block]){
-			// Then we can load it from the cache and increase the hit count
-			if(verbose){
-				System.out.printf("Found tag %d in block %d!\n\n", tag, block);
+		if(tag == tags[block] && !found){
+			if(!(status[block] == 0)){ //check MSI state is not invalid
+				// Then we can load it from the cache and increase the hit count
+				if(verbose){
+					System.out.printf("Found tag %d in block %d!\n\n", tag, block);
+				}
+				// Do not need to change state on read hit
+				hits++;
+				hit = true;
+			} else{
+				//Load in updated values for cache line (ie not a hit), change state to shared
+				status[block] = 1;
+				if(showGui){
+					gui.updateBlock(cacheNumber, block, cache[block], tag);
+					gui.setStatus(cacheNumber, block, status[block]);
+				}
+				if(verbose){
+					System.out.println("Found invalid cache line");
+					System.out.printf("Loading updated block %d into cache\n\n", block);
+				}
 			}
-			// Do not need to change state on read hit
-			hits++;
-			found = true;
+			found=true;
+
 		}
 		
 		// READ MISS
@@ -80,7 +118,7 @@ public class MSICache implements Cache{
 			for(int i = 0; i < cache[block].length; i++){
 				cache[block][i] = memoryBlock*blockSize+i;
 				tags[block] = tag;
-				valid[block] = true;
+				used[block] = true;
 			}
 			
 			//set status of this cache block to be shared (can only have read miss in invalid state)
@@ -104,7 +142,7 @@ public class MSICache implements Cache{
 		
 		//Notify other caches of this operation
 		for(int i = 0; i < otherCaches.length; i++){
-			otherCaches[i].remoteLoad(address, found, verbose);
+			otherCaches[i].remoteLoad(address, hit, verbose);
 		}
 		
 	}
@@ -124,19 +162,41 @@ public class MSICache implements Cache{
 			System.out.printf("Looking for word %d with tag %d in block %d\n", address, tag, block);
 		}
 		
+		if(!used[block]){ //If this line is empty
+			//Loading the corresponding block from memory to the cache
+			for(int i = 0; i < cache[block].length; i++){
+				cache[block][i] = memoryBlock*blockSize+i;
+				tags[block] = tag;
+				used[block] = true;
+			}
+			
+			//set status of this cache block to be modified
+			status[block] = 2;
+			
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
+			if(verbose){
+				System.out.println("READ MISS!");
+				System.out.printf("Loading block %d into cache\n\n", block);
+			}
+			found = true;
+		}
 		//Check if this block is in the cache
 		//If we find the tag
 		//WRITE HIT
-		if((tag == tags[block]) && valid[block]){
-			// Then we can load it from the cache and increase the hit count
-			if(verbose){
-				System.out.println("Write hit!!");
-				System.out.printf("Found tag %d in block %d!\n", tag, block);
-			}
+		if(tag == tags[block]){
+			//If in modified state
 			if(status[block] != 2){
+				// Then we can load it from the cache and increase the hit count
+				if(verbose){
+					System.out.println("Write hit!!");
+					System.out.printf("Found tag %d in block %d!\n", tag, block);
+				}
 				hits++;
 			}
-			found = true;
 			//If block is in Shared state, changed to modified
 			if(status[block] == 1){
 				status[block] = 2;
@@ -147,6 +207,7 @@ public class MSICache implements Cache{
 					System.out.printf("Setting status of cache %d block %d to modified\n", cacheNumber, block);
 				}
 			}
+			found = true;
 		}
 		
 		//WRITE MISS
@@ -158,11 +219,11 @@ public class MSICache implements Cache{
 			for(int i = 0; i < cache[block].length; i++){
 				cache[block][i] = memoryBlock*blockSize+i;
 				tags[block] = tag;
-				valid[block] = true;
+				used[block] = true;
 			}
 			
 			//set status of this cache block to shared
-			status[block] = 1;
+			status[block] = 2;
 			
 			//Update the gui
 			if(showGui){
@@ -189,7 +250,7 @@ public class MSICache implements Cache{
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
 		//Do we have the remote address in this cache?
-		if((tag == tags[block]) && valid[block]){
+		if((tag == tags[block]) && used[block]){
 			
 			//was it a read hit? dont care
 			//Was it a read miss?
@@ -217,21 +278,7 @@ public class MSICache implements Cache{
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
 		//Do we have the remote address in this cache?
-		if((tag == tags[block]) && valid[block]){
-			
-			//Was it a remote write hit? Our Cache copy is now invalid
-			if(hit){
-				if(status[block] != 0){
-					status[block] = 0;
-					invalidations++;
-					if(verbose)
-						System.out.printf("\nCACHE %d INVALIDATION!!!\n\n", cacheNumber);
-					if(showGui){
-						gui.setStatus(cacheNumber, block, status[block]);
-						gui.updateStats(cacheNumber, operations, hits, invalidations);
-					}
-				}
-			}
+		if((tag == tags[block]) && used[block]){
 			
 			//Was it a remote write miss?
 			if(!hit){
