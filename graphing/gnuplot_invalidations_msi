@@ -11,5 +11,5 @@ set ylabel 'block size'
 set zlabel 'Total Invalidations' rotate right
 set grid
 set border 4095 front linetype -1 linewidth 1.000
-set view 112,335
+#set view 112,335
 splot 'results' with lines

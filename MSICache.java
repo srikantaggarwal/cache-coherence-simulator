@@ -149,6 +149,7 @@ public class MSICache implements Cache{
 	
 	public void store(long address, boolean verbose){
 		
+		boolean hit = false;
 		boolean found = false;
 		
 		operations++;
@@ -196,6 +197,7 @@ public class MSICache implements Cache{
 					System.out.printf("Found tag %d in block %d!\n", tag, block);
 				}
 				hits++;
+				hit=true;
 			}
 			//If block is in Shared state, changed to modified
 			if(status[block] == 1){
@@ -239,7 +241,7 @@ public class MSICache implements Cache{
 		
 		//Notify other caches of this operation
 		for(int i = 0; i < otherCaches.length; i++){
-			otherCaches[i].remoteStore(address, found, verbose);
+			otherCaches[i].remoteStore(address, hit, verbose);
 		}
 	}
 	
