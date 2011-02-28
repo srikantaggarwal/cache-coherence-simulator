@@ -1,8 +1,9 @@
 #!/usr/bin/gnuplot -persist
 set term postscript eps enhanced color
 set output 'output.eps'
-set pm3d at b
+set pm3d
 set ticslevel 0.1
+set dgrid3d 40,40
 set isosample 40,40
 set title 'Hit Rate in MESI Cache'
 set xlabel 'blocks'

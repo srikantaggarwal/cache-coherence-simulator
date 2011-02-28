@@ -15,7 +15,7 @@ public class MESICache implements Cache{
 	//The cache
 	long[][] cache;
 	int[] tags;
-	boolean[] valid;
+	boolean[] used;
 	int[] status; //Status' 0 = Invalid, 1 = shared, 2 = modified, 3 = exclusive 
 	
 	MESICache[] otherCaches = new MESICache[3];
@@ -34,11 +34,11 @@ public class MESICache implements Cache{
 		
 		cache = new long[blocks][blockSize];
 		tags = new int[blocks];
-		valid = new boolean[blocks];
+		used = new boolean[blocks];
 		status = new int[blocks];
 		
-		for(int i = 0; i < valid.length; i++){
-			valid[i] = false;
+		for(int i = 0; i < used.length; i++){
+			used[i] = false;
 			status[i] = 0;
 			
 			if(showGui) gui.setStatus(cacheNumber, i, status[i]);
@@ -61,11 +61,32 @@ public class MESICache implements Cache{
 			System.out.printf("Processor %d load of address %d\n", cacheNumber, address);
 			System.out.printf("Looking for word %d with tag %d in block %d\n", address, tag, block);
 		}
-		
-		//Check if this block is in the cache
+		if(!used[block]){ //If this line is empty
+			//Loading the corresponding block from memory to the cache
+			for(int i = 0; i < cache[block].length; i++){
+				cache[block][i] = memoryBlock*blockSize+i;
+				tags[block] = tag;
+				used[block] = true;
+			}
+			
+			//set status of this cache block to be modified
+			status[block] = 2;
+			
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
+			if(verbose){
+				System.out.println("READ MISS!");
+				System.out.printf("Loading block %d into cache\n\n", block);
+			}
+			found = true;
+		}
+		// Check if this block is in the cache
 		// If we find the tag and it is valid
 		// READ HIT
-		if((tag == tags[block]) && valid[block] && status[block] != 0){
+		if(tag == tags[block]){
 			// Then we can load it from the cache and increase the hit count
 			if(verbose){
 				System.out.printf("Found tag %d in block %d!\n\n", tag, block);
@@ -79,13 +100,13 @@ public class MESICache implements Cache{
 		if(status[block] == 0){ // if cache line is in invalid state
 			//Check if the line exists in any other cache
 			for(int i = 0; i < otherCaches.length; i++){
-				if(otherCaches[i].getTags()[block] == tag){
+				if(otherCaches[i].getTags()[block] == tag /*&& otherCaches[i]*/){
 					//We have found the tage in another cache, load line into cache and goto shared state
 					//Loading the corresponding block from memory to the cache
 					for(int j = 0; j < cache[block].length; j++){
 						cache[block][j] = memoryBlock*blockSize+j;
 						tags[block] = tag;
-						valid[block] = true;
+						used[block] = true;
 					}
 					status[block] = 1;
 					found = true;
@@ -99,7 +120,7 @@ public class MESICache implements Cache{
 				for(int j = 0; j < cache[block].length; j++){
 					cache[block][j] = memoryBlock*blockSize+j;
 					tags[block] = tag;
-					valid[block] = true;
+					used[block] = true;
 				}
 				status[block] = 3;
 				found = true;
@@ -118,7 +139,7 @@ public class MESICache implements Cache{
 			for(int i = 0; i < cache[block].length; i++){
 				cache[block][i] = memoryBlock*blockSize+i;
 				tags[block] = tag;
-				valid[block] = true;
+				used[block] = true;
 			}
 			
 			//Update the gui
@@ -159,11 +180,32 @@ public class MESICache implements Cache{
 			System.out.printf("Processor %d store of address %d\n", cacheNumber, address);
 			System.out.printf("Looking for word %d with tag %d in block %d\n", address, tag, block);
 		}
-		
+		if(!used[block]){ //If this line is empty
+			//Loading the corresponding block from memory to the cache
+			for(int i = 0; i < cache[block].length; i++){
+				cache[block][i] = memoryBlock*blockSize+i;
+				tags[block] = tag;
+				used[block] = true;
+			}
+			
+			//set status of this cache block to be modified
+			status[block] = 2;
+			
+			//Update the gui
+			if(showGui){
+				gui.updateBlock(cacheNumber, block, cache[block], tag);
+				gui.setStatus(cacheNumber, block, status[block]);
+			}
+			if(verbose){
+				System.out.println("READ MISS!");
+				System.out.printf("Loading block %d into cache\n\n", block);
+			}
+			found = true;
+		}
 		//Check if this block is in the cache
 		//If we find the tag and it's not invalid
 		//WRITE HIT
-		if((tag == tags[block]) && valid[block] && status[block] != 0){
+		if(tag == tags[block]){
 			// Then we can load it from the cache and increase the hit count
 			if(verbose){
 				System.out.println("Write hit!!");
@@ -192,7 +234,7 @@ public class MESICache implements Cache{
 			for(int i = 0; i < cache[block].length; i++){
 				cache[block][i] = memoryBlock*blockSize+i;
 				tags[block] = tag;
-				valid[block] = true;
+				used[block] = true;
 			}
 			//Update the gui
 			if(showGui){
@@ -203,7 +245,7 @@ public class MESICache implements Cache{
 			found = true;
 		}
 		
-		//WRITE MISS
+		//Not in cache
 		if(!found){
 			if(verbose)
 				System.out.println("Write miss!!");
@@ -212,7 +254,7 @@ public class MESICache implements Cache{
 			for(int i = 0; i < cache[block].length; i++){
 				cache[block][i] = memoryBlock*blockSize+i;
 				tags[block] = tag;
-				valid[block] = true;
+				used[block] = true;
 			}
 			
 			//Update the gui
@@ -240,7 +282,7 @@ public class MESICache implements Cache{
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
 		if(tag == tags[block]){
-			if(valid[block])
+			if(used[block])
 				status[block] = 1;
 		}
 
@@ -257,8 +299,8 @@ public class MESICache implements Cache{
 		int block = (int)(memoryBlock%blocks); //The block in cache where we will put the memoryBlock
 		int tag = (int)memoryBlock/blocks; //The tag of the memoryBlock
 		
-		if(tag == tags[block]){
-			if(valid[block]){
+		if(tag == tags[block] && !hit){
+			if(used[block]){
 				status[block] = 0;
 				invalidations++;
 			}
